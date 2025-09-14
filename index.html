@@ -2,59 +2,218 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <title>📁 รายชื่อไฟล์ใน SchoolAssets</title>
+  <title>📁 SchoolAssets Viewer</title>
   <style>
-    body { font-family: sans-serif; padding: 2em; background: #f0f0f0; }
-    h1 { color: #333; }
-    ul { list-style: none; padding: 0; }
-    li { margin: 10px 0; }
-    img { max-width: 200px; display: block; margin-top: 5px; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(to bottom right, #e0e0e0, #f5f5f5);
+      backdrop-filter: blur(10px);
+      padding: 2em;
+    }
+
+    .glass {
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 16px;
+      padding: 2em;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      backdrop-filter: blur(12px);
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1em;
+      flex-wrap: wrap;
+    }
+
+    input[type="search"] {
+      padding: 0.5em;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      width: 250px;
+    }
+
+    button {
+      padding: 0.5em 1em;
+      border-radius: 8px;
+      border: none;
+      background: #007aff;
+      color: white;
+      cursor: pointer;
+      margin-left: 0.5em;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1em;
+    }
+
+    th, td {
+      padding: 0.75em;
+      border-bottom: 1px solid #ccc;
+      text-align: left;
+    }
+
+    img {
+      max-width: 100px;
+      border-radius: 8px;
+    }
+
+    .box-view {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1em;
+      margin-top: 1em;
+    }
+
+    .box-item {
+      width: calc(25% - 1em);
+      background: rgba(255,255,255,0.8);
+      border-radius: 12px;
+      padding: 1em;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      text-align: center;
+    }
+
+    .pagination {
+      margin-top: 1em;
+      text-align: center;
+    }
+
+    .pagination button {
+      margin: 0 0.25em;
+      background: #eee;
+      color: #333;
+    }
+
+    .active-page {
+      background: #007aff;
+      color: white;
+    }
   </style>
 </head>
 <body>
-  <h1>📂 รายชื่อไฟล์ใน SchoolAssets</h1>
-  <ul id="file-list">กำลังโหลดไฟล์...</ul>
+  <div class="glass">
+    <h1>📂 SchoolAssets Viewer</h1>
+
+    <div class="controls">
+      <input type="search" id="searchInput" placeholder="ค้นหาชื่อไฟล์...">
+      <div>
+        <button onclick="setView('table')">ตาราง</button>
+        <button onclick="setView('box')">กล่อง</button>
+      </div>
+    </div>
+
+    <div id="contentArea"></div>
+    <div class="pagination" id="pagination"></div>
+  </div>
 
   <script>
     const owner = "benzbil";
     const repo = "SchoolAssets";
-    const branch = "main"; // หรือ main ถ้าใช้ branch นั้น
-    const path = ""; // ถ้าต้องการดูในโฟลเดอร์ย่อย เช่น "images"
-
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+    const branch = "gh-pages";
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/?ref=${branch}`;
     const rawBase = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/`;
 
-    fetch(apiUrl)
-      .then(response => response.json())
-      .then(data => {
-        const list = document.getElementById("file-list");
-        list.innerHTML = "";
+    let allFiles = [];
+    let currentPage = 1;
+    const itemsPerPage = 6;
+    let currentView = "table";
 
-        data.forEach(item => {
-          if (item.type === "file") {
-            const li = document.createElement("li");
-            const link = document.createElement("a");
-            link.href = rawBase + item.path;
-            link.textContent = item.name;
-            link.target = "_blank";
+    function setView(view) {
+      currentView = view;
+      render();
+    }
 
-            const img = document.createElement("img");
-            img.src = rawBase + item.path;
-            img.alt = item.name;
-
-            li.appendChild(link);
-            if (item.name.match(/\.(jpg|jpeg|png|gif)$/i)) {
-              li.appendChild(img);
-            }
-
-            list.appendChild(li);
-          }
+    function fetchFiles() {
+      fetch(apiUrl)
+        .then(res => res.json())
+        .then(data => {
+          allFiles = data.filter(item => item.type === "file" && item.name.match(/\.(jpg|jpeg|png)$/i))
+            .map(item => ({
+              name: item.name,
+              url: rawBase + item.path,
+              date: new Date().toLocaleDateString()
+            }));
+          render();
         });
-      })
-      .catch(error => {
-        document.getElementById("file-list").textContent = "เกิดข้อผิดพลาดในการโหลดไฟล์";
-        console.error("Error fetching files:", error);
-      });
+    }
+
+    function render() {
+      const searchTerm = document.getElementById("searchInput").value.toLowerCase();
+      const filtered = allFiles.filter(f => f.name.toLowerCase().includes(searchTerm));
+      const start = (currentPage - 1) * itemsPerPage;
+      const paginated = filtered.slice(start, start + itemsPerPage);
+
+      const content = document.getElementById("contentArea");
+      content.innerHTML = "";
+
+      if (currentView === "table") {
+        const table = document.createElement("table");
+        table.innerHTML = `
+          <thead>
+            <tr><th>ชื่อไฟล์</th><th>วันที่อัปโหลด</th><th>Thumbnail</th></tr>
+          </thead>
+          <tbody>
+            ${paginated.map(file => `
+              <tr>
+                <td>${file.name}</td>
+                <td>${file.date}</td>
+                <td><img src="${file.url}" alt="${file.name}"></td>
+              </tr>
+            `).join("")}
+          </tbody>
+        `;
+        content.appendChild(table);
+      } else {
+        const box = document.createElement("div");
+        box.className = "box-view";
+        paginated.forEach(file => {
+          const item = document.createElement("div");
+          item.className = "box-item";
+          item.innerHTML = `
+            <img src="${file.url}" alt="${file.name}">
+            <p>${file.name}</p>
+            <small>${file.date}</small>
+          `;
+          box.appendChild(item);
+        });
+        content.appendChild(box);
+      }
+
+      renderPagination(filtered.length);
+    }
+
+    function renderPagination(totalItems) {
+      const totalPages = Math.ceil(totalItems / itemsPerPage);
+      const pagination = document.getElementById("pagination");
+      pagination.innerHTML = "";
+
+      for (let i = 1; i <= totalPages; i++) {
+        const btn = document.createElement("button");
+        btn.textContent = i;
+        if (i === currentPage) btn.classList.add("active-page");
+        btn.onclick = () => {
+          currentPage = i;
+          render();
+        };
+        pagination.appendChild(btn);
+      }
+    }
+
+    document.getElementById("searchInput").addEventListener("input", () => {
+      currentPage = 1;
+      render();
+    });
+
+    fetchFiles();
   </script>
 </body>
 </html>
